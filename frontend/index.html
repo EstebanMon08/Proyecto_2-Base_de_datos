@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LootVault — Panel de Administración</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f7f5;
+  --surface:#ffffff;
+  --surface2:#f0efe9;
+  --border:#e2e1db;
+  --text:#1a1a18;
+  --text2:#6b6b66;
+  --text3:#9e9e97;
+  --accent:#2563eb;
+  --accent-light:#eff6ff;
+  --accent-hover:#1d4ed8;
+  --danger:#dc2626;
+  --danger-light:#fef2f2;
+  --success:#16a34a;
+  --success-light:#f0fdf4;
+  --warning:#d97706;
+  --warning-light:#fffbeb;
+  --radius:10px;
+  --shadow:0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --font:'DM Sans',sans-serif;
+  --mono:'DM Mono',monospace;
+  --nav-w:220px;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+
+/* ── NAV ── */
+nav{
+  width:var(--nav-w);min-width:var(--nav-w);height:100vh;position:sticky;top:0;
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:0;overflow:hidden;
+}
+.nav-header{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+.nav-logo{font-size:18px;font-weight:600;letter-spacing:-0.5px;color:var(--text)}
+.nav-logo span{color:var(--accent)}
+.nav-subtitle{font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+.nav-user{padding:14px 20px;border-bottom:1px solid var(--border);display:none}
+.nav-user.visible{display:block}
+.nav-user-name{font-size:13px;font-weight:500}
+.nav-user-role{font-size:11px;color:var(--text3);margin-top:1px}
+nav ul{list-style:none;padding:10px 10px;flex:1;overflow-y:auto}
+nav ul li a{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;
+  border-radius:8px;text-decoration:none;color:var(--text2);
+  font-size:13.5px;font-weight:500;transition:all 0.15s;cursor:pointer;
+}
+nav ul li a:hover{background:var(--surface2);color:var(--text)}
+nav ul li a.active{background:var(--accent-light);color:var(--accent)}
+nav ul li a .icon{font-size:16px;width:20px;text-align:center}
+.nav-section{padding:16px 20px 6px;font-size:10px;font-weight:600;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase}
+.nav-bottom{padding:14px 10px;border-top:1px solid var(--border)}
+.nav-bottom a{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;
+  border-radius:8px;text-decoration:none;color:var(--danger);
+  font-size:13.5px;font-weight:500;cursor:pointer;transition:all 0.15s;
+}
+.nav-bottom a:hover{background:var(--danger-light)}
+
+/* ── MAIN ── */
+main{flex:1;min-height:100vh;overflow-y:auto}
+.page{display:none;padding:36px 40px;max-width:1100px}
+.page.active{display:block}
+
+
+
+/* ── TYPOGRAPHY ── */
+.page-title{font-size:22px;font-weight:600;letter-spacing:-0.4px;margin-bottom:4px}
+.page-desc{font-size:13.5px;color:var(--text2);margin-bottom:28px}
+
+/* ── CARDS & STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.stat-label{font-size:11.5px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+.stat-value{font-size:26px;font-weight:600;margin-top:4px;letter-spacing:-0.5px}
+.stat-sub{font-size:12px;color:var(--text3);margin-top:2px}
+
+/* ── TABLE ── */
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-toolbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.table-toolbar h3{font-size:14px;font-weight:600}
+table{width:100%;border-collapse:collapse}
+th{font-size:11.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;padding:10px 16px;text-align:left;border-bottom:1px solid var(--border);background:var(--surface2)}
+td{padding:11px 16px;font-size:13.5px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-blue{background:var(--accent-light);color:var(--accent)}
+.badge-green{background:var(--success-light);color:var(--success)}
+.badge-red{background:var(--danger-light);color:var(--danger)}
+.badge-yellow{background:var(--warning-light);color:var(--warning)}
+
+/* ── FORMS ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+label{font-size:12.5px;font-weight:500;color:var(--text2)}
+input,select,textarea{
+  padding:9px 12px;border:1px solid var(--border);border-radius:8px;
+  font-family:var(--font);font-size:13.5px;color:var(--text);
+  background:var(--surface);outline:none;transition:border 0.15s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:80px}
+.form-error{font-size:12px;color:var(--danger);margin-top:3px}
+
+/* ── BUTTONS ── */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:8px 16px;
+  border-radius:8px;font-family:var(--font);font-size:13.5px;
+  font-weight:500;cursor:pointer;border:none;transition:all 0.15s;
+}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--border)}
+.btn-danger{background:var(--danger-light);color:var(--danger);border:1px solid #fecaca}
+.btn-danger:hover{background:#fee2e2}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+
+/* ── MODAL ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);
+  z-index:100;align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:var(--surface);border-radius:14px;padding:28px;
+  width:100%;max-width:520px;box-shadow:var(--shadow-md);
+  max-height:90vh;overflow-y:auto;
+}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.modal-title{font-size:16px;font-weight:600}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:22px}
+
+/* ── ALERT ── */
+.alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none}
+.alert.visible{display:block}
+.alert-error{background:var(--danger-light);color:var(--danger);border:1px solid #fecaca}
+.alert-success{background:var(--success-light);color:var(--success);border:1px solid #bbf7d0}
+
+/* ── REPORT TABLE ── */
+.report-section{margin-bottom:28px}
+.report-title{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.report-title .tag{font-size:10px;background:var(--accent-light);color:var(--accent);padding:2px 7px;border-radius:10px;font-family:var(--mono)}
+.empty{text-align:center;padding:40px;color:var(--text3);font-size:13.5px}
+
+/* ── MISC ── */
+.flex{display:flex}.gap-2{gap:8px}.mt-4{margin-top:16px}.mb-4{margin-bottom:16px}
+.text-sm{font-size:12.5px}.text-muted{color:var(--text3)}
+.divider{border:none;border-top:1px solid var(--border);margin:24px 0}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="main-nav" style="display:none">
+  <div class="nav-header">
+    <div class="nav-logo">Loot<span>Vault</span></div>
+    <div class="nav-subtitle">Admin Panel</div>
+  </div>
+  <div class="nav-user" id="nav-user">
+    <div class="nav-user-name" id="nav-user-name">—</div>
+    <div class="nav-user-role" id="nav-user-role">—</div>
+  </div>
+  <ul>
+    <li><a class="nav-link active" data-page="dashboard"><span class="icon">▦</span>Dashboard</a></li>
+    <div class="nav-section">Catálogo</div>
+    <li><a class="nav-link" data-page="items"><span class="icon">◈</span>Ítems</a></li>
+    <li><a class="nav-link" data-page="lootboxes"><span class="icon">⬡</span>Lootboxes</a></li>
+    <li><a class="nav-link" data-page="categorias"><span class="icon">◻</span>Categorías</a></li>
+    <li><a class="nav-link" data-page="proveedores"><span class="icon">◎</span>Proveedores</a></li>
+    <div class="nav-section">Ventas</div>
+    <li><a class="nav-link" data-page="ordenes"><span class="icon">◑</span>Órdenes</a></li>
+    <li><a class="nav-link" data-page="usuarios"><span class="icon">○</span>Usuarios</a></li>
+    <div class="nav-section">Análisis</div>
+    <li><a class="nav-link" data-page="reportes"><span class="icon">◐</span>Reportes</a></li>
+  </ul>
+  <div class="nav-bottom">
+    <a id="btn-logout"><span class="icon">→</span>Cerrar sesión</a>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main id="main-content">
+
+
+
+  <!-- DASHBOARD -->
+  <div id="page-dashboard" class="page">
+    <div class="page-title">Dashboard</div>
+    <div class="page-desc">Resumen general de la tienda</div>
+    <div class="stats-grid" id="dashboard-stats">
+      <div class="stat-card"><div class="stat-label">Ítems</div><div class="stat-value" id="stat-items">—</div><div class="stat-sub">en catálogo</div></div>
+      <div class="stat-card"><div class="stat-label">Lootboxes</div><div class="stat-value" id="stat-lootboxes">—</div><div class="stat-sub">disponibles</div></div>
+      <div class="stat-card"><div class="stat-label">Órdenes</div><div class="stat-value" id="stat-ordenes">—</div><div class="stat-sub">totales</div></div>
+      <div class="stat-card"><div class="stat-label">Usuarios</div><div class="stat-value" id="stat-usuarios">—</div><div class="stat-sub">registrados</div></div>
+    </div>
+    <div class="table-card">
+      <div class="table-toolbar"><h3>Últimas órdenes</h3></div>
+      <table><thead><tr><th>ID</th><th>Usuario</th><th>Empleado</th><th>Total</th><th>Productos</th><th>Estado</th></tr></thead>
+      <tbody id="dashboard-orders"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ITEMS -->
+  <div id="page-items" class="page">
+    <div class="page-title">Ítems</div>
+    <div class="page-desc">Gestiona los ítems del catálogo</div>
+    <div class="table-card">
+      <div class="table-toolbar">
+        <h3>Todos los ítems</h3>
+        <button class="btn btn-primary btn-sm" id="btn-new-item">+ Nuevo ítem</button>
+      </div>
+      <table><thead><tr><th>ID</th><th>Nombre</th><th>Categoría</th><th>Proveedor</th><th>Precio</th><th>Stock</th><th>Ed. Limitada</th><th></th></tr></thead>
+      <tbody id="items-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- LOOTBOXES -->
+  <div id="page-lootboxes" class="page">
+    <div class="page-title">Lootboxes</div>
+    <div class="page-desc">Gestiona las cajas de botín</div>
+    <div class="table-card">
+      <div class="table-toolbar">
+        <h3>Todas las lootboxes</h3>
+        <button class="btn btn-primary btn-sm" id="btn-new-lootbox">+ Nueva lootbox</button>
+      </div>
+      <table><thead><tr><th>ID</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Ed. Limitada</th><th>Expira</th><th></th></tr></thead>
+      <tbody id="lootboxes-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- CATEGORIAS -->
+  <div id="page-categorias" class="page">
+    <div class="page-title">Categorías</div>
+    <div class="page-desc">Gestiona las categorías de productos</div>
+    <div class="table-card">
+      <div class="table-toolbar">
+        <h3>Todas las categorías</h3>
+        <button class="btn btn-primary btn-sm" id="btn-new-cat">+ Nueva categoría</button>
+      </div>
+      <table><thead><tr><th>ID</th><th>Nombre</th><th>Descripción</th><th></th></tr></thead>
+      <tbody id="categorias-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- PROVEEDORES -->
+  <div id="page-proveedores" class="page">
+    <div class="page-title">Proveedores</div>
+    <div class="page-desc">Gestiona los proveedores de contenido</div>
+    <div class="table-card">
+      <div class="table-toolbar">
+        <h3>Todos los proveedores</h3>
+        <button class="btn btn-primary btn-sm" id="btn-new-prov">+ Nuevo proveedor</button>
+      </div>
+      <table><thead><tr><th>ID</th><th>Nombre</th><th>Contacto</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="proveedores-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ORDENES -->
+  <div id="page-ordenes" class="page">
+    <div class="page-title">Órdenes</div>
+    <div class="page-desc">Historial de ventas (via VIEW venta_resumen)</div>
+    <div class="table-card">
+      <div class="table-toolbar"><h3>Todas las órdenes</h3></div>
+      <table><thead><tr><th>ID</th><th>Fecha</th><th>Usuario</th><th>Empleado</th><th>Productos</th><th>Total</th><th>Estado</th></tr></thead>
+      <tbody id="ordenes-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- USUARIOS -->
+  <div id="page-usuarios" class="page">
+    <div class="page-title">Usuarios</div>
+    <div class="page-desc">Jugadores registrados en la plataforma</div>
+    <div class="table-card">
+      <div class="table-toolbar"><h3>Todos los usuarios</h3></div>
+      <table><thead><tr><th>ID</th><th>Usuario</th><th>Email</th><th>Saldo</th><th>Registro</th></tr></thead>
+      <tbody id="usuarios-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- REPORTES -->
+  <div id="page-reportes" class="page">
+    <div class="page-title">Reportes</div>
+    <div class="page-desc">Consultas avanzadas sobre ventas e inventario</div>
+
+    <div class="report-section">
+      <div class="report-title">Top ítems más vendidos <span class="tag">JOIN múltiple</span></div>
+      <div class="table-card">
+        <table><thead><tr><th>Ítem</th><th>Categoría</th><th>Proveedor</th><th>Unidades</th><th>Ingresos</th></tr></thead>
+        <tbody id="rep-top-items"></tbody></table>
+      </div>
+    </div>
+
+    <div class="report-section">
+      <div class="report-title">Ventas por empleado <span class="tag">GROUP BY + HAVING</span></div>
+      <div class="table-card">
+        <table><thead><tr><th>Empleado</th><th>Rol</th><th>Órdenes</th><th>Total vendido</th></tr></thead>
+        <tbody id="rep-ventas-empleado"></tbody></table>
+      </div>
+    </div>
+
+    <div class="report-section">
+      <div class="report-title">Ranking de usuarios por gasto <span class="tag">CTE</span></div>
+      <div class="table-card">
+        <table><thead><tr><th>#</th><th>Usuario</th><th>Email</th><th>Órdenes</th><th>Gasto total</th></tr></thead>
+        <tbody id="rep-ranking"></tbody></table>
+      </div>
+    </div>
+
+    <div class="report-section">
+      <div class="report-title">Usuarios que compraron ed. limitada <span class="tag">Subquery IN</span></div>
+      <div class="table-card">
+        <table><thead><tr><th>Usuario</th><th>Email</th><th>Saldo</th></tr></thead>
+        <tbody id="rep-usuarios-limitados"></tbody></table>
+      </div>
+    </div>
+
+    <div class="report-section">
+      <div class="report-title">Ítems sin ninguna venta <span class="tag">Subquery EXISTS</span></div>
+      <div class="table-card">
+        <table><thead><tr><th>ID</th><th>Nombre</th><th>Precio</th><th>Stock</th></tr></thead>
+        <tbody id="rep-items-sin-venta"></tbody></table>
+      </div>
+    </div>
+
+    <div class="report-section">
+      <div class="report-title">Categorías populares <span class="tag">HAVING</span></div>
+      <div class="table-card">
+        <table><thead><tr><th>Categoría</th><th>Ítems distintos</th><th>Unidades vendidas</th><th>Ingresos</th></tr></thead>
+        <tbody id="rep-categorias"></tbody></table>
+      </div>
+    </div>
+
+    <button class="btn btn-secondary" id="btn-export-csv">⬇ Exportar ranking a CSV</button>
+  </div>
+
+</main>
+
+<!-- MODAL CATEGORÍA -->
+<div class="modal-overlay" id="modal-cat">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-cat-title">Nueva categoría</div>
+      <button class="modal-close" data-close="modal-cat">✕</button>
+    </div>
+    <div class="alert alert-error" id="modal-cat-error"></div>
+    <div class="form-group mb-4">
+      <label>Nombre *</label>
+      <input type="text" id="cat-nombre" placeholder="Ej: Armas"/>
+    </div>
+    <div class="form-group">
+      <label>Descripción</label>
+      <textarea id="cat-desc" placeholder="Descripción opcional"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="modal-cat">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-cat">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PROVEEDOR -->
+<div class="modal-overlay" id="modal-prov">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-prov-title">Nuevo proveedor</div>
+      <button class="modal-close" data-close="modal-prov">✕</button>
+    </div>
+    <div class="alert alert-error" id="modal-prov-error"></div>
+    <div class="form-group mb-4">
+      <label>Nombre *</label>
+      <input type="text" id="prov-nombre" placeholder="Ej: NexaStudios"/>
+    </div>
+    <div class="form-group mb-4">
+      <label>Contacto</label>
+      <input type="text" id="prov-contacto" placeholder="email@proveedor.com"/>
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="prov-activo">
+        <option value="true">Activo</option>
+        <option value="false">Inactivo</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="modal-prov">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-prov">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ITEM -->
+<div class="modal-overlay" id="modal-item">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-item-title">Nuevo ítem</div>
+      <button class="modal-close" data-close="modal-item">✕</button>
+    </div>
+    <div class="alert alert-error" id="modal-item-error"></div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Nombre *</label><input type="text" id="item-nombre"/></div>
+      <div class="form-group"><label>Precio *</label><input type="number" id="item-precio" step="0.01" min="0"/></div>
+      <div class="form-group"><label>Stock *</label><input type="number" id="item-stock" min="0"/></div>
+      <div class="form-group"><label>Categoría *</label><select id="item-categoria"></select></div>
+      <div class="form-group"><label>Proveedor *</label><select id="item-proveedor"></select></div>
+      <div class="form-group"><label>Edición limitada</label>
+        <select id="item-limitada"><option value="false">No</option><option value="true">Sí</option></select>
+      </div>
+      <div class="form-group full"><label>Descripción</label><textarea id="item-desc"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="modal-item">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-item">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LOOTBOX -->
+<div class="modal-overlay" id="modal-lootbox">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-lootbox-title">Nueva lootbox</div>
+      <button class="modal-close" data-close="modal-lootbox">✕</button>
+    </div>
+    <div class="alert alert-error" id="modal-lootbox-error"></div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Nombre *</label><input type="text" id="lb-nombre"/></div>
+      <div class="form-group"><label>Precio *</label><input type="number" id="lb-precio" step="0.01" min="0"/></div>
+      <div class="form-group"><label>Stock *</label><input type="number" id="lb-stock" min="0"/></div>
+      <div class="form-group"><label>Categoría *</label><select id="lb-categoria"></select></div>
+      <div class="form-group"><label>Proveedor *</label><select id="lb-proveedor"></select></div>
+      <div class="form-group"><label>Edición limitada</label>
+        <select id="lb-limitada"><option value="false">No</option><option value="true">Sí</option></select>
+      </div>
+      <div class="form-group"><label>Fecha expiración</label><input type="date" id="lb-expira"/></div>
+      <div class="form-group full"><label>Descripción</label><textarea id="lb-desc"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="modal-lootbox">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-lootbox">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:3000/api';
+let currentEdit = {};
+let rankingData = [];
+
+// ── UTILS ──
+const $ = id => document.getElementById(id);
+const fmt = n => n != null ? `$${parseFloat(n).toFixed(2)}` : '—';
+const fmtDate = d => d ? new Date(d).toLocaleDateString('es-GT') : '—';
+
+function showAlert(id, msg, type='error'){
+  const el = $(id);
+  el.textContent = msg;
+  el.className = `alert alert-${type} visible`;
+}
+function hideAlert(id){ $(id).className = 'alert'; }
+
+function showModal(id){ $(id).classList.add('open'); }
+function hideModal(id){ $(id).classList.remove('open'); }
+
+document.querySelectorAll('[data-close]').forEach(btn => {
+  btn.addEventListener('click', () => hideModal(btn.dataset.close));
+});
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if(e.target===m) hideModal(m.id); });
+});
+
+// ── NAVIGATION ──
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  $(`page-${name}`).classList.add('active');
+  document.querySelector(`[data-page="${name}"]`)?.classList.add('active');
+  loadPage(name);
+}
+
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', () => showPage(link.dataset.page));
+});
+
+// ── AUTH ──
+async function checkAuth(){
+  setLoggedIn({ nombre: 'Admin', rol: 'Administrador' });
+}
+
+function setLoggedIn(u){
+  $('main-nav').style.display = 'flex';
+  $('nav-user').classList.add('visible');
+  $('nav-user-name').textContent = u.nombre;
+  $('nav-user-role').textContent = u.rol;
+  showPage('dashboard');
+}
+
+$('btn-logout').addEventListener('click', () => {
+  alert('Sesión cerrada');
+});
+
+// ── LOAD PAGE ──
+async function loadPage(name){
+  if(name==='dashboard')    await loadDashboard();
+  if(name==='categorias')   await loadCategorias();
+  if(name==='proveedores')  await loadProveedores();
+  if(name==='items')        await loadItems();
+  if(name==='lootboxes')    await loadLootboxes();
+  if(name==='ordenes')      await loadOrdenes();
+  if(name==='usuarios')     await loadUsuarios();
+  if(name==='reportes')     await loadReportes();
+}
+
+async function apiFetch(path, opts={}){
+  const r = await fetch(`${API}${path}`, {credentials:'include', ...opts});
+  return r.json();
+}
+
+// ── DASHBOARD ──
+async function loadDashboard(){
+  const [items, lbs, ords, usrs] = await Promise.all([
+    apiFetch('/items'), apiFetch('/lootboxes'),
+    apiFetch('/ordenes'), apiFetch('/usuarios')
+  ]);
+  $('stat-items').textContent     = items.length ?? '—';
+  $('stat-lootboxes').textContent = lbs.length ?? '—';
+  $('stat-ordenes').textContent   = ords.length ?? '—';
+  $('stat-usuarios').textContent  = usrs.length ?? '—';
+
+  const tbody = $('dashboard-orders');
+  const recent = (ords||[]).slice(0,8);
+  tbody.innerHTML = recent.length ? recent.map(o => `
+    <tr>
+      <td><span style="font-family:var(--mono);font-size:12px">#${o.id_orden}</span></td>
+      <td>${o.usuario}</td><td>${o.empleado}</td>
+      <td>${fmt(o.total)}</td>
+      <td>${o.num_productos} prod.</td>
+      <td><span class="badge badge-green">${o.estado}</span></td>
+    </tr>`).join('') : `<tr><td colspan="6" class="empty">Sin órdenes</td></tr>`;
+}
+
+// ── CATEGORIAS ──
+async function loadCategorias(){
+  const data = await apiFetch('/categorias');
+  const tbody = $('categorias-table');
+  tbody.innerHTML = (data||[]).map(c => `
+    <tr>
+      <td><span style="font-family:var(--mono);font-size:12px">${c.id_categoria}</span></td>
+      <td>${c.nombre}</td>
+      <td style="color:var(--text2)">${c.descripcion||'—'}</td>
+      <td>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary btn-sm" onclick="editCat(${c.id_categoria},'${c.nombre.replace(/'/g,"\\'")}','${(c.descripcion||'').replace(/'/g,"\\'")}')">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCat(${c.id_categoria})">Eliminar</button>
+        </div>
+      </td>
+    </tr>`).join('') || `<tr><td colspan="4" class="empty">Sin categorías</td></tr>`;
+}
+
+$('btn-new-cat').addEventListener('click', () => {
+  currentEdit = {};
+  $('modal-cat-title').textContent = 'Nueva categoría';
+  $('cat-nombre').value = '';
+  $('cat-desc').value = '';
+  hideAlert('modal-cat-error');
+  showModal('modal-cat');
+});
+
+function editCat(id, nombre, desc){
+  currentEdit = {id};
+  $('modal-cat-title').textContent = 'Editar categoría';
+  $('cat-nombre').value = nombre;
+  $('cat-desc').value = desc;
+  hideAlert('modal-cat-error');
+  showModal('modal-cat');
+}
+
+async function deleteCat(id){
+  if(!confirm('¿Eliminar esta categoría?')) return;
+  const r = await apiFetch(`/categorias/${id}`, {method:'DELETE'});
+  if(r.error){ alert(r.error); return; }
+  loadCategorias();
+}
+
+$('btn-save-cat').addEventListener('click', async () => {
+  const nombre = $('cat-nombre').value.trim();
+  if(!nombre){ showAlert('modal-cat-error','El nombre es requerido'); return; }
+  const body = {nombre, descripcion: $('cat-desc').value};
+  const path = currentEdit.id ? `/categorias/${currentEdit.id}` : '/categorias';
+  const method = currentEdit.id ? 'PUT' : 'POST';
+  const r = await apiFetch(path, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  if(r.error){ showAlert('modal-cat-error', r.error); return; }
+  hideModal('modal-cat');
+  loadCategorias();
+});
+
+// ── PROVEEDORES ──
+async function loadProveedores(){
+  const data = await apiFetch('/proveedores');
+  const tbody = $('proveedores-table');
+  tbody.innerHTML = (data||[]).map(p => `
+    <tr>
+      <td><span style="font-family:var(--mono);font-size:12px">${p.id_proveedor}</span></td>
+      <td>${p.nombre}</td>
+      <td style="color:var(--text2)">${p.contacto||'—'}</td>
+      <td><span class="badge ${p.activo ? 'badge-green':'badge-red'}">${p.activo ? 'Activo':'Inactivo'}</span></td>
+      <td>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary btn-sm" onclick="editProv(${p.id_proveedor},'${p.nombre.replace(/'/g,"\\'")}','${(p.contacto||'').replace(/'/g,"\\'")}',${p.activo})">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProv(${p.id_proveedor})">Eliminar</button>
+        </div>
+      </td>
+    </tr>`).join('') || `<tr><td colspan="5" class="empty">Sin proveedores</td></tr>`;
+}
+
+$('btn-new-prov').addEventListener('click', () => {
+  currentEdit = {};
+  $('modal-prov-title').textContent = 'Nuevo proveedor';
+  $('prov-nombre').value = '';
+  $('prov-contacto').value = '';
+  $('prov-activo').value = 'true';
+  hideAlert('modal-prov-error');
+  showModal('modal-prov');
+});
+
+function editProv(id, nombre, contacto, activo){
+  currentEdit = {id};
+  $('modal-prov-title').textContent = 'Editar proveedor';
+  $('prov-nombre').value = nombre;
+  $('prov-contacto').value = contacto;
+  $('prov-activo').value = String(activo);
+  hideAlert('modal-prov-error');
+  showModal('modal-prov');
+}
+
+async function deleteProv(id){
+  if(!confirm('¿Eliminar este proveedor?')) return;
+  const r = await apiFetch(`/proveedores/${id}`, {method:'DELETE'});
+  if(r.error){ alert(r.error); return; }
+  loadProveedores();
+}
+
+$('btn-save-prov').addEventListener('click', async () => {
+  const nombre = $('prov-nombre').value.trim();
+  if(!nombre){ showAlert('modal-prov-error','El nombre es requerido'); return; }
+  const body = {nombre, contacto: $('prov-contacto').value, activo: $('prov-activo').value === 'true'};
+  const path = currentEdit.id ? `/proveedores/${currentEdit.id}` : '/proveedores';
+  const method = currentEdit.id ? 'PUT' : 'POST';
+  const r = await apiFetch(path, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  if(r.error){ showAlert('modal-prov-error', r.error); return; }
+  hideModal('modal-prov');
+  loadProveedores();
+});
+
+// ── ITEMS ──
+async function loadItems(){
+  const data = await apiFetch('/items');
+  const tbody = $('items-table');
+  tbody.innerHTML = (data||[]).map(i => `
+    <tr>
+      <td><span style="font-family:var(--mono);font-size:12px">${i.id_item}</span></td>
+      <td>${i.nombre}</td>
+      <td><span class="badge badge-blue">${i.categoria}</span></td>
+      <td style="color:var(--text2)">${i.proveedor}</td>
+      <td>${fmt(i.precio)}</td>
+      <td>${i.stock}</td>
+      <td><span class="badge ${i.es_edicion_limitada ? 'badge-yellow':'badge-green'}">${i.es_edicion_limitada ? 'Sí':'No'}</span></td>
+      <td>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary btn-sm" onclick="editItem(${i.id_item})">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteItem(${i.id_item})">Eliminar</button>
+        </div>
+      </td>
+    </tr>`).join('') || `<tr><td colspan="8" class="empty">Sin ítems</td></tr>`;
+}
+
+async function loadSelectsForItem(){
+  const [cats, provs] = await Promise.all([apiFetch('/categorias'), apiFetch('/proveedores')]);
+  ['item-categoria','lb-categoria'].forEach(id => {
+    const el = $(id);
+    if(el) el.innerHTML = cats.map(c => `<option value="${c.id_categoria}">${c.nombre}</option>`).join('');
+  });
+  ['item-proveedor','lb-proveedor'].forEach(id => {
+    const el = $(id);
+    if(el) el.innerHTML = provs.map(p => `<option value="${p.id_proveedor}">${p.nombre}</option>`).join('');
+  });
+}
+
+$('btn-new-item').addEventListener('click', async () => {
+  currentEdit = {};
+  $('modal-item-title').textContent = 'Nuevo ítem';
+  ['item-nombre','item-precio','item-stock','item-desc'].forEach(id => $(id).value = '');
+  $('item-limitada').value = 'false';
+  hideAlert('modal-item-error');
+  await loadSelectsForItem();
+  showModal('modal-item');
+});
+
+async function editItem(id){
+  const data = await apiFetch('/items');
+  const item = data.find(i => i.id_item === id);
+  if(!item) return;
+  currentEdit = {id};
+  $('modal-item-title').textContent = 'Editar ítem';
+  $('item-nombre').value = item.nombre;
+  $('item-precio').value = item.precio;
+  $('item-stock').value = item.stock;
+  $('item-desc').value = item.descripcion || '';
+  $('item-limitada').value = String(item.es_edicion_limitada);
+  hideAlert('modal-item-error');
+  await loadSelectsForItem();
+  $('item-categoria').value = item.id_categoria;
+  $('item-proveedor').value = item.id_proveedor;
+  showModal('modal-item');
+}
+
+async function deleteItem(id){
+  if(!confirm('¿Eliminar este ítem?')) return;
+  const r = await apiFetch(`/items/${id}`, {method:'DELETE'});
+  if(r.error){ alert(r.error); return; }
+  loadItems();
+}
+
+$('btn-save-item').addEventListener('click', async () => {
+  const nombre = $('item-nombre').value.trim();
+  const precio = $('item-precio').value;
+  const stock  = $('item-stock').value;
+  const id_categoria = $('item-categoria').value;
+  const id_proveedor = $('item-proveedor').value;
+  if(!nombre||!precio||stock===''||!id_categoria||!id_proveedor){
+    showAlert('modal-item-error','Completa todos los campos requeridos'); return;
+  }
+  const body = {nombre, descripcion:$('item-desc').value, precio:parseFloat(precio),
+    stock:parseInt(stock), es_edicion_limitada:$('item-limitada').value==='true',
+    id_categoria:parseInt(id_categoria), id_proveedor:parseInt(id_proveedor)};
+  const path   = currentEdit.id ? `/items/${currentEdit.id}` : '/items';
+  const method = currentEdit.id ? 'PUT' : 'POST';
+  const r = await apiFetch(path, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  if(r.error){ showAlert('modal-item-error', r.error); return; }
+  hideModal('modal-item');
+  loadItems();
+});
+
+// ── LOOTBOXES ──
+async function loadLootboxes(){
+  const data = await apiFetch('/lootboxes');
+  const tbody = $('lootboxes-table');
+  tbody.innerHTML = (data||[]).map(l => `
+    <tr>
+      <td><span style="font-family:var(--mono);font-size:12px">${l.id_lootbox}</span></td>
+      <td>${l.nombre}</td>
+      <td><span class="badge badge-blue">${l.categoria}</span></td>
+      <td>${fmt(l.precio)}</td>
+      <td>${l.stock}</td>
+      <td><span class="badge ${l.es_edicion_limitada ? 'badge-yellow':'badge-green'}">${l.es_edicion_limitada ? 'Sí':'No'}</span></td>
+      <td style="color:var(--text2)">${fmtDate(l.fecha_expiracion)}</td>
+      <td>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary btn-sm" onclick="editLootbox(${l.id_lootbox})">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteLootbox(${l.id_lootbox})">Eliminar</button>
+        </div>
+      </td>
+    </tr>`).join('') || `<tr><td colspan="8" class="empty">Sin lootboxes</td></tr>`;
+}
+
+$('btn-new-lootbox').addEventListener('click', async () => {
+  currentEdit = {};
+  $('modal-lootbox-title').textContent = 'Nueva lootbox';
+  ['lb-nombre','lb-precio','lb-stock','lb-desc','lb-expira'].forEach(id => $(id).value = '');
+  $('lb-limitada').value = 'false';
+  hideAlert('modal-lootbox-error');
+  await loadSelectsForItem();
+  showModal('modal-lootbox');
+});
+
+async function editLootbox(id){
+  const data = await apiFetch('/lootboxes');
+  const lb = data.find(l => l.id_lootbox === id);
+  if(!lb) return;
+  currentEdit = {id};
+  $('modal-lootbox-title').textContent = 'Editar lootbox';
+  $('lb-nombre').value = lb.nombre;
+  $('lb-precio').value = lb.precio;
+  $('lb-stock').value  = lb.stock;
+  $('lb-desc').value   = lb.descripcion || '';
+  $('lb-limitada').value = String(lb.es_edicion_limitada);
+  $('lb-expira').value = lb.fecha_expiracion ? lb.fecha_expiracion.split('T')[0] : '';
+  hideAlert('modal-lootbox-error');
+  await loadSelectsForItem();
+  $('lb-categoria').value = lb.id_categoria;
+  $('lb-proveedor').value = lb.id_proveedor;
+  showModal('modal-lootbox');
+}
+
+async function deleteLootbox(id){
+  if(!confirm('¿Eliminar esta lootbox?')) return;
+  const r = await apiFetch(`/lootboxes/${id}`, {method:'DELETE'});
+  if(r.error){ alert(r.error); return; }
+  loadLootboxes();
+}
+
+$('btn-save-lootbox').addEventListener('click', async () => {
+  const nombre = $('lb-nombre').value.trim();
+  const precio = $('lb-precio').value;
+  const stock  = $('lb-stock').value;
+  const id_categoria = $('lb-categoria').value;
+  const id_proveedor = $('lb-proveedor').value;
+  if(!nombre||!precio||stock===''||!id_categoria||!id_proveedor){
+    showAlert('modal-lootbox-error','Completa todos los campos requeridos'); return;
+  }
+  const body = {nombre, descripcion:$('lb-desc').value, precio:parseFloat(precio),
+    stock:parseInt(stock), es_edicion_limitada:$('lb-limitada').value==='true',
+    fecha_expiracion:$('lb-expira').value||null,
+    id_categoria:parseInt(id_categoria), id_proveedor:parseInt(id_proveedor)};
+  const path   = currentEdit.id ? `/lootboxes/${currentEdit.id}` : '/lootboxes';
+  const method = currentEdit.id ? 'PUT' : 'POST';
+  const r = await apiFetch(path, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  if(r.error){ showAlert('modal-lootbox-error', r.error); return; }
+  hideModal('modal-lootbox');
+  loadLootboxes();
+});
+
+// ── ÓRDENES ──
+async function loadOrdenes(){
+  const data = await apiFetch('/ordenes');
+  const tbody = $('ordenes-table');
+  tbody.innerHTML = (data||[]).map(o => `
+    <tr>
+      <td><span style="font-family:var(--mono);font-size:12px">#${o.id_orden}</span></td>
+      <td style="color:var(--text2);font-size:12.5px">${fmtDate(o.fecha)}</td>
+      <td>${o.usuario}</td><td>${o.empleado}</td>
+      <td>${o.num_productos} prod.</td>
+      <td>${fmt(o.total)}</td>
+      <td><span class="badge badge-green">${o.estado}</span></td>
+    </tr>`).join('') || `<tr><td colspan="7" class="empty">Sin órdenes</td></tr>`;
+}
+
+// ── USUARIOS ──
+async function loadUsuarios(){
+  const data = await apiFetch('/usuarios');
+  const tbody = $('usuarios-table');
+  tbody.innerHTML = (data||[]).map(u => `
+    <tr>
+      <td><span style="font-family:var(--mono);font-size:12px">${u.id_usuario}</span></td>
+      <td>${u.nombre_usuario}</td>
+      <td style="color:var(--text2)">${u.email}</td>
+      <td>${fmt(u.saldo)}</td>
+      <td style="color:var(--text2);font-size:12.5px">${fmtDate(u.fecha_registro)}</td>
+    </tr>`).join('') || `<tr><td colspan="5" class="empty">Sin usuarios</td></tr>`;
+}
+
+// ── REPORTES ──
+async function loadReportes(){
+  const [topItems, ventasEmp, ranking, usrsLim, sinVenta, catsPop] = await Promise.all([
+    apiFetch('/reportes/top-items'),
+    apiFetch('/reportes/ventas-empleado'),
+    apiFetch('/reportes/ranking-usuarios'),
+    apiFetch('/reportes/usuarios-limitados'),
+    apiFetch('/reportes/items-sin-venta'),
+    apiFetch('/reportes/categorias-populares'),
+  ]);
+
+  rankingData = ranking || [];
+
+  $('rep-top-items').innerHTML = (topItems||[]).map(r => `
+    <tr><td>${r.item}</td><td><span class="badge badge-blue">${r.categoria}</span></td>
+    <td style="color:var(--text2)">${r.proveedor}</td>
+    <td>${r.total_vendido}</td><td>${fmt(r.ingresos)}</td></tr>`
+  ).join('') || `<tr><td colspan="5" class="empty">Sin datos</td></tr>`;
+
+  $('rep-ventas-empleado').innerHTML = (ventasEmp||[]).map(r => `
+    <tr><td>${r.empleado}</td><td><span class="badge badge-blue">${r.rol}</span></td>
+    <td>${r.total_ordenes}</td><td>${fmt(r.total_vendido)}</td></tr>`
+  ).join('') || `<tr><td colspan="4" class="empty">Sin datos</td></tr>`;
+
+  $('rep-ranking').innerHTML = (ranking||[]).map(r => `
+    <tr><td><strong>${r.ranking}</strong></td><td>${r.nombre_usuario}</td>
+    <td style="color:var(--text2)">${r.email}</td>
+    <td>${r.total_ordenes||0}</td><td>${fmt(r.gasto_total||0)}</td></tr>`
+  ).join('') || `<tr><td colspan="5" class="empty">Sin datos</td></tr>`;
+
+  $('rep-usuarios-limitados').innerHTML = (usrsLim||[]).map(r => `
+    <tr><td>${r.nombre_usuario}</td>
+    <td style="color:var(--text2)">${r.email}</td>
+    <td>${fmt(r.saldo)}</td></tr>`
+  ).join('') || `<tr><td colspan="3" class="empty">Sin datos</td></tr>`;
+
+  $('rep-items-sin-venta').innerHTML = (sinVenta||[]).map(r => `
+    <tr><td><span style="font-family:var(--mono);font-size:12px">${r.id_item}</span></td>
+    <td>${r.nombre}</td><td>${fmt(r.precio)}</td><td>${r.stock}</td></tr>`
+  ).join('') || `<tr><td colspan="4" class="empty">Todos los ítems han sido vendidos</td></tr>`;
+
+  $('rep-categorias').innerHTML = (catsPop||[]).map(r => `
+    <tr><td>${r.categoria}</td><td>${r.total_items}</td>
+    <td>${r.unidades_vendidas}</td><td>${fmt(r.ingresos_totales)}</td></tr>`
+  ).join('') || `<tr><td colspan="4" class="empty">Sin datos</td></tr>`;
+}
+
+// ── EXPORT CSV ──
+$('btn-export-csv').addEventListener('click', () => {
+  if(!rankingData.length){ alert('Carga los reportes primero'); return; }
+  const headers = ['Ranking','Usuario','Email','Total Ordenes','Gasto Total'];
+  const rows = rankingData.map(r =>
+    [r.ranking, r.nombre_usuario, r.email, r.total_ordenes||0, r.gasto_total||0].join(',')
+  );
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ranking_usuarios.csv';
+  a.click();
+});
+
+// ── INIT ──
+checkAuth();
+</script>
+</body>
+</html>
