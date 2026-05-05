@@ -1,11 +1,12 @@
 const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ─── DB CONNECTION ─────────────────────────────────────────────────────────
+//DB CONNECTION
 const pool = new Pool({
   host:     process.env.DB_HOST,
   port:     process.env.DB_PORT,
@@ -14,13 +15,14 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
 });
 
-// ─── MIDDLEWARE ────────────────────────────────────────────────────────────
+//MIDDLEWARE
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-// ══════════════════════════════════════════════════════════════════════════
-// CATEGORIAS - CRUD completo
-// ══════════════════════════════════════════════════════════════════════════
+
+// CATEGORIAS
+
 
 app.get("/api/categorias", async (req, res) => {
   try {
@@ -66,9 +68,8 @@ app.delete("/api/categorias/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════════════════
 // ITEMS - CRUD completo
-// ══════════════════════════════════════════════════════════════════════════
+
 
 app.get("/api/items", async (req, res) => {
   try {
@@ -130,10 +131,8 @@ app.delete("/api/items/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════════════════
-// LOOTBOXES - CRUD completo
-// ══════════════════════════════════════════════════════════════════════════
 
+// LOOTBOXES
 app.get("/api/lootboxes", async (req, res) => {
   try {
     const result = await pool.query(`
@@ -195,10 +194,8 @@ app.delete("/api/lootboxes/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════════════════
-// PROVEEDORES - CRUD
-// ══════════════════════════════════════════════════════════════════════════
 
+// PROVEEDORES
 app.get("/api/proveedores", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM Proveedor ORDER BY id_proveedor");
@@ -243,9 +240,8 @@ app.delete("/api/proveedores/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════════════════
+
 // USUARIOS
-// ══════════════════════════════════════════════════════════════════════════
 
 app.get("/api/usuarios", async (req, res) => {
   try {
@@ -254,9 +250,8 @@ app.get("/api/usuarios", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════════════════
+
 // ÓRDENES - con transacción explícita
-// ══════════════════════════════════════════════════════════════════════════
 
 app.get("/api/ordenes", async (req, res) => {
   try {
@@ -325,9 +320,8 @@ app.post("/api/ordenes", async (req, res) => {
   }
 });
 
-// ══════════════════════════════════════════════════════════════════════════
+
 // REPORTES
-// ══════════════════════════════════════════════════════════════════════════
 
 app.get("/api/reportes/top-items", async (req, res) => {
   try {
@@ -448,7 +442,6 @@ app.get("/api/reportes/ranking-usuarios", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ══════════════════════════════════════════════════════════════════════════
+
 // START
-// ══════════════════════════════════════════════════════════════════════════
 app.listen(PORT, () => console.log(`Backend corriendo en puerto ${PORT}`));
