@@ -1,9 +1,12 @@
-const express = require("express");
+const express  = require("express");
 const { Pool } = require("pg");
-const cors = require("cors");
-const path = require('path');
+const cors     = require("cors");
+const path     = require("path");
+const bcrypt   = require("bcrypt");
+const session  = require("express-session");
+const { sequelize, orm } = require('./orm');
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3000;
 
 //DB CONNECTION
@@ -20,18 +23,201 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use(session({
+  secret: process.env.SESSION_SECRET || "lootbox_secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { httpOnly: true, maxAge: 8 * 60 * 60 * 1000 }
+}));
 
-// CATEGORIAS
+sequelize.authenticate()
+  .then(() => console.log('ORM Sequelize conectado'))
+  .catch(err => console.error('Error ORM:', err));
 
+// ── PERMISOS POR ROL ───────────────────────────────────────
+const ROLE_PERMISSIONS = {
+  rol_admin:     ["dashboard","items","lootboxes","categorias","proveedores","ordenes","usuarios","reportes"],
+  rol_empleado:  ["dashboard","items","lootboxes","categorias","proveedores","ordenes","usuarios"],
+  rol_bodeguero: ["dashboard","items","lootboxes","categorias","proveedores"],
+  rol_contador:  ["dashboard","ordenes","reportes"],
+  rol_cliente:   ["dashboard","items","lootboxes","categorias"],
+};
 
-app.get("/api/categorias", async (req, res) => {
+// ── MIDDLEWARES DE AUTH ────────────────────────────────────
+function requireAuth(req, res, next) {
+  if (!req.session.usuario)
+    return res.status(401).json({ error: "No autenticado" });
+  next();
+}
+
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.session.usuario)
+      return res.status(401).json({ error: "No autenticado" });
+    if (!roles.includes(req.session.usuario.rol))
+      return res.status(403).json({ error: "No tienes permiso para esta acción" });
+    next();
+  };
+}
+
+// ── HELPER STORED PROCEDURES ───────────────────────────────
+async function callSP(spName, inParams, outParams) {
+  const allParams = [...inParams, ...outParams.map(() => null)];
+  const placeholders = allParams.map((_, i) => `$${i + 1}`).join(', ');
+  const result = await pool.query(`CALL ${spName}(${placeholders})`, allParams);
+  return result.rows[0];
+}
+
+// ── AUTH ROUTES ────────────────────────────────────────────
+app.post("/api/auth/login", async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password)
+    return res.status(400).json({ error: "Usuario y contraseña requeridos" });
+  try {
+    const result = await pool.query(
+      "SELECT * FROM AppUsuario WHERE username = $1 AND activo = TRUE", [username]
+    );
+    if (!result.rows.length)
+      return res.status(401).json({ error: "Credenciales inválidas" });
+    const usuario = result.rows[0];
+    const match = await bcrypt.compare(password, usuario.password_hash);
+    if (!match)
+      return res.status(401).json({ error: "Credenciales inválidas" });
+    req.session.usuario = {
+      id: usuario.id_appusuario, username: usuario.username,
+      nombre: usuario.nombre, rol: usuario.rol,
+    };
+    res.json({ mensaje: "Login exitoso", usuario: req.session.usuario,
+      permisos: ROLE_PERMISSIONS[usuario.rol] || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  req.session.destroy(err => {
+    if (err) return res.status(500).json({ error: "Error al cerrar sesión" });
+    res.clearCookie("connect.sid");
+    res.json({ mensaje: "Sesión cerrada" });
+  });
+});
+
+app.get("/api/auth/me", (req, res) => {
+  if (!req.session.usuario)
+    return res.status(401).json({ error: "No autenticado" });
+  res.json({ usuario: req.session.usuario,
+    permisos: ROLE_PERMISSIONS[req.session.usuario.rol] || [] });
+});
+
+// ── STORED PROCEDURE ROUTES ────────────────────────────────
+app.post('/api/sp/ventas', requireRole('rol_admin','rol_empleado'), async (req, res) => {
+  const { id_usuario, id_empleado, id_item, id_lootbox, cantidad, precio } = req.body;
+  if (!id_usuario || !id_empleado || !cantidad || !precio)
+    return res.status(400).json({ error: 'Faltan campos requeridos' });
+  try {
+    const r = await callSP('sp_registrar_venta',
+      [id_usuario, id_empleado, id_item||null, id_lootbox||null, cantidad, precio],
+      ['p_id_orden','p_mensaje']);
+    if (!r.p_id_orden) return res.status(400).json({ error: r.p_mensaje });
+    res.status(201).json({ id_orden: r.p_id_orden, mensaje: r.p_mensaje });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.put('/api/sp/stock', requireRole('rol_admin','rol_bodeguero'), async (req, res) => {
+  const { tipo, id, nuevo_stock } = req.body;
+  if (!tipo || !id || nuevo_stock === undefined)
+    return res.status(400).json({ error: 'Faltan campos requeridos' });
+  try {
+    const r = await callSP('sp_actualizar_stock', [tipo, id, nuevo_stock],
+      ['p_stock_anterior','p_mensaje']);
+    res.json({ stock_anterior: r.p_stock_anterior, mensaje: r.p_mensaje });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/sp/items', requireRole('rol_admin','rol_bodeguero'), async (req, res) => {
+  const { nombre, descripcion, precio, stock, es_edicion_limitada, id_categoria, id_proveedor } = req.body;
+  if (!nombre || !precio || stock === undefined || !id_categoria || !id_proveedor)
+    return res.status(400).json({ error: 'Faltan campos requeridos' });
+  try {
+    const r = await callSP('sp_crear_item',
+      [nombre, descripcion||null, precio, stock, es_edicion_limitada??false, id_categoria, id_proveedor],
+      ['p_id_item','p_mensaje']);
+    if (!r.p_id_item) return res.status(400).json({ error: r.p_mensaje });
+    res.status(201).json({ id_item: r.p_id_item, mensaje: r.p_mensaje });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.put('/api/sp/ordenes/:id/cancelar', requireRole('rol_admin','rol_empleado'), async (req, res) => {
+  try {
+    const r = await callSP('sp_cancelar_orden', [parseInt(req.params.id)], ['p_mensaje']);
+    res.json({ mensaje: r.p_mensaje });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/sp/reportes/ventas', requireRole('rol_admin','rol_contador'), async (req, res) => {
+  const { desde, hasta } = req.query;
+  if (!desde || !hasta)
+    return res.status(400).json({ error: 'Parámetros desde y hasta requeridos' });
+  try {
+    const r = await callSP('sp_reporte_ventas_periodo', [desde, hasta],
+      ['p_total_ordenes','p_total_ingresos','p_mensaje']);
+    res.json({ total_ordenes: r.p_total_ordenes, total_ingresos: r.p_total_ingresos, mensaje: r.p_mensaje });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ── ORM ROUTES ─────────────────────────────────────────────
+app.get('/api/orm/categorias', requireAuth, async (req, res) => {
+  try { res.json(await orm.getCategorias()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/orm/categorias', requireRole('rol_admin'), async (req, res) => {
+  const { nombre, descripcion } = req.body;
+  if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
+  try { res.status(201).json(await orm.createCategoria({ nombre, descripcion })); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/orm/categorias/:id', requireRole('rol_admin'), async (req, res) => {
+  const { nombre, descripcion } = req.body;
+  if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
+  try { res.json(await orm.updateCategoria(req.params.id, { nombre, descripcion })); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/orm/categorias/:id', requireRole('rol_admin'), async (req, res) => {
+  try { res.json(await orm.deleteCategoria(req.params.id)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/orm/proveedores', requireAuth, async (req, res) => {
+  try { res.json(await orm.getProveedores()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/orm/proveedores', requireRole('rol_admin'), async (req, res) => {
+  const { nombre, contacto, activo } = req.body;
+  if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
+  try { res.status(201).json(await orm.createProveedor({ nombre, contacto, activo })); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.put('/api/orm/proveedores/:id', requireRole('rol_admin'), async (req, res) => {
+  const { nombre, contacto, activo } = req.body;
+  if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
+  try { res.json(await orm.updateProveedor(req.params.id, { nombre, contacto, activo })); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/orm/proveedores/:id', requireRole('rol_admin'), async (req, res) => {
+  try { res.json(await orm.deleteProveedor(req.params.id)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/orm/items/:id', requireRole('rol_admin'), async (req, res) => {
+  try { res.json(await orm.deleteItem(req.params.id)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── CATEGORIAS ─────────────────────────────────────────────
+app.get("/api/categorias", requireAuth, async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM Categoria ORDER BY id_categoria");
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post("/api/categorias", async (req, res) => {
+app.post("/api/categorias", requireRole("rol_admin"), async (req, res) => {
   const { nombre, descripcion } = req.body;
   if (!nombre) return res.status(400).json({ error: "El nombre es requerido" });
   try {
@@ -43,7 +229,7 @@ app.post("/api/categorias", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put("/api/categorias/:id", async (req, res) => {
+app.put("/api/categorias/:id", requireRole("rol_admin"), async (req, res) => {
   const { nombre, descripcion } = req.body;
   if (!nombre) return res.status(400).json({ error: "El nombre es requerido" });
   try {
@@ -57,7 +243,7 @@ app.put("/api/categorias/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete("/api/categorias/:id", async (req, res) => {
+app.delete("/api/categorias/:id", requireRole("rol_admin"), async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM Categoria WHERE id_categoria=$1 RETURNING *", [req.params.id]
@@ -68,10 +254,8 @@ app.delete("/api/categorias/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ITEMS - CRUD completo
-
-
-app.get("/api/items", async (req, res) => {
+// ── ITEMS ──────────────────────────────────────────────────
+app.get("/api/items", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT i.*, c.nombre AS categoria, p.nombre AS proveedor
@@ -84,7 +268,7 @@ app.get("/api/items", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post("/api/items", async (req, res) => {
+app.post("/api/items", requireRole("rol_admin", "rol_bodeguero"), async (req, res) => {
   const { nombre, descripcion, precio, stock, es_edicion_limitada,
           id_categoria, id_proveedor } = req.body;
   if (!nombre || !precio || stock === undefined || !id_categoria || !id_proveedor)
@@ -101,7 +285,7 @@ app.post("/api/items", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put("/api/items/:id", async (req, res) => {
+app.put("/api/items/:id", requireRole("rol_admin", "rol_bodeguero"), async (req, res) => {
   const { nombre, descripcion, precio, stock, es_edicion_limitada,
           id_categoria, id_proveedor } = req.body;
   if (!nombre || !precio || stock === undefined || !id_categoria || !id_proveedor)
@@ -120,7 +304,7 @@ app.put("/api/items/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete("/api/items/:id", async (req, res) => {
+app.delete("/api/items/:id", requireRole("rol_admin"), async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM Item WHERE id_item=$1 RETURNING *", [req.params.id]
@@ -131,9 +315,8 @@ app.delete("/api/items/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-// LOOTBOXES
-app.get("/api/lootboxes", async (req, res) => {
+// ── LOOTBOXES ──────────────────────────────────────────────
+app.get("/api/lootboxes", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT l.*, c.nombre AS categoria, p.nombre AS proveedor
@@ -146,7 +329,7 @@ app.get("/api/lootboxes", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post("/api/lootboxes", async (req, res) => {
+app.post("/api/lootboxes", requireRole("rol_admin", "rol_bodeguero"), async (req, res) => {
   const { nombre, descripcion, precio, stock, es_edicion_limitada,
           fecha_expiracion, id_categoria, id_proveedor } = req.body;
   if (!nombre || !precio || stock === undefined || !id_categoria || !id_proveedor)
@@ -163,7 +346,7 @@ app.post("/api/lootboxes", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put("/api/lootboxes/:id", async (req, res) => {
+app.put("/api/lootboxes/:id", requireRole("rol_admin", "rol_bodeguero"), async (req, res) => {
   const { nombre, descripcion, precio, stock, es_edicion_limitada,
           fecha_expiracion, id_categoria, id_proveedor } = req.body;
   if (!nombre || !precio || stock === undefined || !id_categoria || !id_proveedor)
@@ -183,7 +366,7 @@ app.put("/api/lootboxes/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete("/api/lootboxes/:id", async (req, res) => {
+app.delete("/api/lootboxes/:id", requireRole("rol_admin"), async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM Lootbox WHERE id_lootbox=$1 RETURNING *", [req.params.id]
@@ -194,16 +377,15 @@ app.delete("/api/lootboxes/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-// PROVEEDORES
-app.get("/api/proveedores", async (req, res) => {
+// ── PROVEEDORES ────────────────────────────────────────────
+app.get("/api/proveedores", requireAuth, async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM Proveedor ORDER BY id_proveedor");
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post("/api/proveedores", async (req, res) => {
+app.post("/api/proveedores", requireRole("rol_admin"), async (req, res) => {
   const { nombre, contacto, activo } = req.body;
   if (!nombre) return res.status(400).json({ error: "El nombre es requerido" });
   try {
@@ -215,7 +397,7 @@ app.post("/api/proveedores", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put("/api/proveedores/:id", async (req, res) => {
+app.put("/api/proveedores/:id", requireRole("rol_admin"), async (req, res) => {
   const { nombre, contacto, activo } = req.body;
   if (!nombre) return res.status(400).json({ error: "El nombre es requerido" });
   try {
@@ -229,7 +411,7 @@ app.put("/api/proveedores/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete("/api/proveedores/:id", async (req, res) => {
+app.delete("/api/proveedores/:id", requireRole("rol_admin"), async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM Proveedor WHERE id_proveedor=$1 RETURNING *", [req.params.id]
@@ -240,27 +422,23 @@ app.delete("/api/proveedores/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-// USUARIOS
-
-app.get("/api/usuarios", async (req, res) => {
+// ── USUARIOS ───────────────────────────────────────────────
+app.get("/api/usuarios", requireRole("rol_admin", "rol_empleado"), async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM Usuario ORDER BY id_usuario");
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-// ÓRDENES - con transacción explícita
-
-app.get("/api/ordenes", async (req, res) => {
+// ── ÓRDENES ────────────────────────────────────────────────
+app.get("/api/ordenes", requireRole("rol_admin", "rol_empleado", "rol_contador"), async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM venta_resumen ORDER BY fecha DESC");
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post("/api/ordenes", async (req, res) => {
+app.post("/api/ordenes", requireRole("rol_admin", "rol_empleado"), async (req, res) => {
   const { id_usuario, id_empleado, items } = req.body;
   if (!id_usuario || !id_empleado || !items || items.length === 0)
     return res.status(400).json({ error: "Faltan datos de la orden" });
@@ -268,16 +446,13 @@ app.post("/api/ordenes", async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
     const total = items.reduce((sum, i) => sum + i.cantidad * i.precio_unitario, 0);
-
     const ordenResult = await client.query(
       `INSERT INTO Orden (fecha, total, estado, id_usuario, id_empleado)
        VALUES (NOW(), $1, 'completada', $2, $3) RETURNING *`,
       [total, id_usuario, id_empleado]
     );
     const orden = ordenResult.rows[0];
-
     for (const item of items) {
       await client.query(
         `INSERT INTO DetalleOrden (id_orden, id_item, id_lootbox, cantidad, precio_unitario)
@@ -285,7 +460,6 @@ app.post("/api/ordenes", async (req, res) => {
         [orden.id_orden, item.id_item || null, item.id_lootbox || null,
          item.cantidad, item.precio_unitario]
       );
-
       if (item.id_item) {
         const stockCheck = await client.query(
           "SELECT stock FROM Item WHERE id_item=$1", [item.id_item]
@@ -309,7 +483,6 @@ app.post("/api/ordenes", async (req, res) => {
         );
       }
     }
-
     await client.query("COMMIT");
     res.status(201).json({ mensaje: "Orden creada", orden });
   } catch (err) {
@@ -320,10 +493,8 @@ app.post("/api/ordenes", async (req, res) => {
   }
 });
 
-
-// REPORTES
-
-app.get("/api/reportes/top-items", async (req, res) => {
+// ── REPORTES ───────────────────────────────────────────────
+app.get("/api/reportes/top-items", requireRole("rol_admin", "rol_contador"), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT i.nombre AS item, c.nombre AS categoria,
@@ -342,7 +513,7 @@ app.get("/api/reportes/top-items", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/api/reportes/ventas-empleado", async (req, res) => {
+app.get("/api/reportes/ventas-empleado", requireRole("rol_admin", "rol_contador"), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT e.nombre AS empleado, e.rol,
@@ -358,7 +529,7 @@ app.get("/api/reportes/ventas-empleado", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/api/reportes/historial/:id_usuario", async (req, res) => {
+app.get("/api/reportes/historial/:id_usuario", requireRole("rol_admin", "rol_empleado"), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT o.id_orden, o.fecha, o.total, o.estado,
@@ -375,7 +546,7 @@ app.get("/api/reportes/historial/:id_usuario", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/api/reportes/usuarios-limitados", async (req, res) => {
+app.get("/api/reportes/usuarios-limitados", requireRole("rol_admin", "rol_contador"), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT * FROM Usuario
@@ -392,7 +563,7 @@ app.get("/api/reportes/usuarios-limitados", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/api/reportes/items-sin-venta", async (req, res) => {
+app.get("/api/reportes/items-sin-venta", requireRole("rol_admin", "rol_contador"), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT i.id_item, i.nombre, i.precio, i.stock
@@ -405,7 +576,7 @@ app.get("/api/reportes/items-sin-venta", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/api/reportes/categorias-populares", async (req, res) => {
+app.get("/api/reportes/categorias-populares", requireRole("rol_admin", "rol_contador"), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT c.nombre AS categoria,
@@ -423,7 +594,7 @@ app.get("/api/reportes/categorias-populares", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/api/reportes/ranking-usuarios", async (req, res) => {
+app.get("/api/reportes/ranking-usuarios", requireRole("rol_admin", "rol_contador"), async (req, res) => {
   try {
     const result = await pool.query(`
       WITH gasto_por_usuario AS (
@@ -442,6 +613,5 @@ app.get("/api/reportes/ranking-usuarios", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-// START
+// ── START ──────────────────────────────────────────────────
 app.listen(PORT, () => console.log(`Backend corriendo en puerto ${PORT}`));

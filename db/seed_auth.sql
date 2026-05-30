@@ -1,3 +1,8 @@
+-- ============================================================
+-- PROYECTO 3 — AUTENTICACIÓN
+-- Archivo: db/seed_auth.sql  →  04_seed_auth.sql
+-- ============================================================
+
 CREATE TABLE IF NOT EXISTS AppUsuario (
   id_appusuario SERIAL PRIMARY KEY,
   username      VARCHAR(60)  NOT NULL UNIQUE,
@@ -9,28 +14,20 @@ CREATE TABLE IF NOT EXISTS AppUsuario (
   activo        BOOLEAN NOT NULL DEFAULT TRUE
 );
 
---Hashes
-
---admin123      $2b$10$KIBpkGLkMlnSvJBMy.0lr.WlFbgFYWvO9iBLKbCGXJl3TFUMfyqRi
---empleado123   $2b$10$N5pQ3kXwMzYa4Vr7cHdJeO1mT8sLpF2nR6uE9jK0iA3bW4xG5yC1S
---bodeguero123  $2b$10$P7qR4mYxNaZb5Ws8dIeKfP2nU9tMqG3oS7vF0kL1jB4cX5yH6zD2T
---contador123   $2b$10$Q8sS5nZyOaAc6Xt9eJfLgQ3oV0uNrH4pT8wG1lM2kC5dY6zI7aE3U
---cliente123    $2b$10$R9tT6oAzPbBd7Yu0fKgMhR4pW1vOsI5qU9xH2mN3lD6eZ7aJ8bF4V
-
 INSERT INTO AppUsuario (username, password_hash, rol, nombre) VALUES
   ('admin',
-   '$2b$10$KIBpkGLkMlnSvJBMy.0lr.WlFbgFYWvO9iBLKbCGXJl3TFUMfyqRi',
+   '$2b$10$8rsCT9Q4HemQzjyAVqMYeem5ioXMeBZSReVC48AoS1RmkH2UhYbte',
    'rol_admin',      'Administrador Principal'),
   ('empleado1',
-   '$2b$10$N5pQ3kXwMzYa4Vr7cHdJeO1mT8sLpF2nR6uE9jK0iA3bW4xG5yC1S',
+   '$2b$10$Ie0/bwf577ppweN8jaNrU./WFiEcPN6bbsf.P590hWxoGFLlflB2C',
    'rol_empleado',   'Carlos Empleado'),
   ('bodeguero1',
-   '$2b$10$P7qR4mYxNaZb5Ws8dIeKfP2nU9tMqG3oS7vF0kL1jB4cX5yH6zD2T',
+   '$2b$10$fa4DG.VJKnmNz5SipbR6ieJrDoKTb.0mTaT3yK6l52OzokqUEYbLe',
    'rol_bodeguero',  'María Bodeguera'),
   ('contador1',
-   '$2b$10$Q8sS5nZyOaAc6Xt9eJfLgQ3oV0uNrH4pT8wG1lM2kC5dY6zI7aE3U',
+   '$2b$10$ZJvHDIOToU7/xOE55tMAGug8oxbP.ckTdDGP/pJFhuKVGOomMf1m2',
    'rol_contador',   'Luis Contador'),
   ('cliente1',
-   '$2b$10$R9tT6oAzPbBd7Yu0fKgMhR4pW1vOsI5qU9xH2mN3lD6eZ7aJ8bF4V',
+   '$2b$10$XMWOy.WLX9hqjZnVu0mxIe6EyiX/b/7DHfgOY5UnKIwBDh0/K7gUW',
    'rol_cliente',    'Ana Cliente')
 ON CONFLICT (username) DO NOTHING;
